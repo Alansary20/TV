@@ -499,33 +499,11 @@ async function toggleFullscreen(){
   document.getElementById('aspectBtn').classList.toggle('show', entering);
   if(entering){
     try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(e){}
-    // محاولة إخفاء شريط حالة أندرويد عبر Fullscreen API القياسي على الحاوية (لا على الفيديو نفسه)
-    // هذا مختلف عن آلية فيديو الفل سكرين الأصلية التي تسببت بمشكلة السكون، فهو أمن
-    try{
-      if(wrap.requestFullscreen) await wrap.requestFullscreen();
-      else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
-    }catch(e){ /* قد لا يدعمه الـ WebView، لا بأس — الوضع البديل بـ CSS يبقى فعالاً */ }
-    requestWakeLock();
+    requestWakeLock(); // تأكيد القفل عند الدخول لملء الشاشة المخصص
   } else {
     try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-    try{
-      if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
-      else if(document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
-    }catch(e){}
   }
 }
-// مزامنة وضعنا المخصص إذا خرج النظام من الفل سكرين الأصلي بطريقة أخرى (زر الرجوع مثلاً)
-function syncFsState(){
-  const isNativeFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  const wrap=document.getElementById('playerWrap');
-  if(!isNativeFs && wrap.classList.contains('fs-mode')){
-    wrap.classList.remove('fs-mode');
-    document.getElementById('fsBtn').textContent='⛶';
-    document.getElementById('aspectBtn').classList.remove('show');
-  }
-}
-document.addEventListener('fullscreenchange', syncFsState);
-document.addEventListener('webkitfullscreenchange', syncFsState);
 // تبديل بين "ملء الشاشة بالكامل" (مع قصّ بسيط للحواف) و"احتواء الصورة كاملة" (مع أشرطة سوداء عند اختلاف نسبة العرض للارتفاع)
 function toggleAspect(){
   const wrap=document.getElementById('playerWrap');
