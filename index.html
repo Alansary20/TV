@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Alansary TV</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+:root {
+  --bg:#080c14; --surface:#0d1420; --card:#111927;
+  --border:#1a2840; --blue:#0055b3; --blue2:#1a7fff;
+  --gold:#f5c518; --text:#e8edf5; --muted:#6b7e99; --live:#e63946;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* Header */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:200;
+}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:20px;font-weight:900;background:linear-gradient(90deg,var(--blue2),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.live-badge-hdr{background:var(--live);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:4px}
+
+/* Source tabs */
+.src-tabs{display:flex;gap:6px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.src-tabs::-webkit-scrollbar{display:none}
+.src-tab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.src-tab.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* Search */
+.search-wrap{padding:10px 14px;background:var(--bg)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 14px}
+.search-box input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:14px}
+.search-box input::placeholder{color:var(--muted)}
+
+/* Cat strip */
+.cat-strip{display:flex;gap:6px;padding:0 14px 10px;overflow-x:auto}
+.cat-strip::-webkit-scrollbar{display:none}
+.cat-chip{flex-shrink:0;padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .2s}
+.cat-chip.active{background:var(--blue2);border-color:var(--blue2);color:#fff}
+
+/* Player */
+.player-wrap{position:relative;background:#000;width:100%}
+.player-wrap video{width:100%;display:block;max-height:220px;background:#000}
+.player-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+.player-overlay.hidden{display:none}
+.play-big{font-size:56px;filter:drop-shadow(0 0 16px rgba(26,127,255,.9))}
+.now-bar{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.9));padding:16px 12px 8px;display:none}
+.now-bar.show{display:block}
+.now-name{font-size:14px;font-weight:700}
+.now-cat{font-size:11px;color:var(--muted)}
+.err-bar{position:absolute;inset:0;background:var(--surface);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted)}
+.err-bar.show{display:flex}
+
+/* Status bar */
+.status-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.status-count{font-size:12px;color:var(--muted)}
+.status-src{font-size:12px;color:var(--blue2);font-weight:600}
+.load-dot{width:7px;height:7px;background:var(--live);border-radius:50%;animation:pulse 1.5s infinite;display:inline-block;margin-left:5px}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+
+/* Grid */
+.grid-wrap{padding:10px 14px;padding-bottom:80px}
+.channels-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(min-width:480px){.channels-grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:700px){.channels-grid{grid-template-columns:repeat(5,1fr)}}
+
+.ch-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;cursor:pointer;text-align:center;transition:all .2s;position:relative;overflow:hidden}
+.ch-card:active{transform:scale(.96)}
+.ch-card.playing{border-color:var(--blue2);background:rgba(0,85,179,.2)}
+.ch-logo{width:44px;height:44px;border-radius:8px;object-fit:contain;margin:0 auto 6px;display:block;background:var(--surface)}
+.ch-fb{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--blue2));margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff}
+.ch-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-dot{position:absolute;top:5px;left:5px;width:7px;height:7px;background:var(--blue2);border-radius:50%;animation:pulse 1.5s infinite}
+
+/* Loading */
+.loading-state{text-align:center;padding:40px 20px;color:var(--muted);grid-column:1/-1}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue2);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Bottom nav */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:200}
+.nav-btn{flex:1;padding:10px 0;text-align:center;cursor:pointer;font-size:11px;color:var(--muted);transition:color .2s;border:none;background:none;font-family:inherit}
+.nav-btn span{display:block;font-size:20px;margin-bottom:2px}
+.nav-btn.active{color:var(--blue2)}
+
+/* Fav panel */
+.fav-panel{display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column}
+.fav-panel.open{display:flex}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.panel-header h2{font-size:16px;font-weight:700}
+.close-btn{background:var(--card);border:1px solid var(--border);color:var(--text);width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.fav-list{flex:1;overflow-y:auto;padding:12px}
+.fav-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.fav-name{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav-del{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0}
+.empty-fav{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
+
+/* Custom M3U panel */
+.custom-panel{display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column}
+.custom-panel.open{display:flex}
+.custom-body{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+.input-label{font-size:12px;color:var(--muted);margin-bottom:4px}
+.custom-body input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.custom-body input:focus{border-color:var(--blue2)}
+.big-btn{width:100%;background:linear-gradient(90deg,var(--blue),var(--blue2));border:none;border-radius:12px;color:#fff;font-family:inherit;font-size:15px;font-weight:700;padding:14px;cursor:pointer}
+.note{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+
+/* Add fav btn */
+.fav-add-btn{position:fixed;bottom:70px;left:14px;background:var(--gold);border:none;border-radius:20px;padding:7px 14px;font-family:inherit;font-size:13px;font-weight:700;color:#000;cursor:pointer;display:none;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.fav-add-btn.show{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📺</div>
+    <span class="logo-text">Alansary TV</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="live-badge-hdr" id="liveCount" style="display:none">LIVE</span>
+    <div style="font-size:12px;color:var(--muted)" id="chCount"></div>
+  </div>
+</header>
+
+<!-- Source tabs -->
+<div class="src-tabs">
+  <button class="src-tab active" onclick="selectSrc(0,this)">🌍 عالمي</button>
+  <button class="src-tab" onclick="selectSrc(1,this)">✅ HD فقط</button>
+  <button class="src-tab" onclick="selectSrc(2,this)">🌙 عربي</button>
+  <button class="src-tab" onclick="selectSrc(3,this)">🇸🇦 السعودية</button>
+  <button class="src-tab" onclick="selectSrc(4,this)">⚽ رياضة</button>
+</div>
+
+<!-- Player -->
+<div class="player-wrap" id="playerWrap">
+  <video id="vid" controls playsinline preload="none"></video>
+  <div class="player-overlay" id="overlay">
+    <span class="play-big">📺</span>
+  </div>
+  <div class="now-bar" id="nowBar">
+    <div class="now-name" id="nowName"></div>
+    <div class="now-cat" id="nowCat"></div>
+  </div>
+  <div class="err-bar" id="errBar">
+    <span style="font-size:36px">⚠️</span>
+    <div>تعذّر تشغيل هذه القناة</div>
+    <div style="font-size:12px">جرّب قناة أخرى</div>
+  </div>
+</div>
+
+<!-- Status -->
+<div class="status-bar">
+  <div class="status-count" id="statusCount">اختر مصدراً للبدء</div>
+  <div class="status-src" id="statusSrc"></div>
+</div>
+
+<!-- Search -->
+<div class="search-wrap">
+  <div class="search-box">
+    <span style="color:var(--muted)">🔍</span>
+    <input type="text" id="searchInput" placeholder="ابحث عن قناة...">
+  </div>
+</div>
+
+<!-- Category strip -->
+<div class="cat-strip" id="catStrip"></div>
+
+<!-- Grid -->
+<div class="grid-wrap">
+  <div class="channels-grid" id="grid">
+    <div class="loading-state">
+      <div style="font-size:32px;margin-bottom:8px">👆</div>
+      <div>اضغط على مصدر أعلاه لتحميل القنوات</div>
+    </div>
+  </div>
+</div>
+
+<!-- Fav add btn -->
+<button class="fav-add-btn" id="favAddBtn" onclick="addFav()">⭐ إضافة للمفضلة</button>
+
+<!-- Bottom nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="showHome()" id="navHome"><span>📺</span>القنوات</button>
+  <button class="nav-btn" onclick="showFavs()" id="navFav"><span>⭐</span>المفضلة</button>
+  <button class="nav-btn" onclick="showCustom()" id="navCustom"><span>🔗</span>رابط مخصص</button>
+</div>
+
+<!-- Fav Panel -->
+<div class="fav-panel" id="favPanel">
+  <div class="panel-header">
+    <h2>⭐ المفضلة</h2>
+    <button class="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div class="fav-list" id="favList"></div>
+</div>
+
+<!-- Custom Panel -->
+<div class="custom-panel" id="customPanel">
+  <div class="panel-header">
+    <h2>🔗 رابط M3U مخصص</h2>
+    <button class="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div class="custom-body">
+    <div>
+      <div class="input-label">أدخل رابط M3U أو M3U8</div>
+      <input type="url" id="customUrl" placeholder="https://example.com/playlist.m3u" dir="ltr">
+    </div>
+    <button class="big-btn" onclick="loadCustom()">⬇️ تحميل القائمة</button>
+    <div class="note">
+      يمكنك استخدام أي رابط M3U من الإنترنت<br>
+      مثال: روابط IPTV من مزود الخدمة أو GitHub
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY = 'https://api.allorigins.win/raw?url=';
+
+const SOURCES = [
+  { name:'عالمي',    url:'https://iptv-org.github.io/iptv/index.m3u' },
+  { name:'HD فقط',  url:'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8' },
+  { name:'عربي',    url:'https://iptv-org.github.io/iptv/languages/ara.m3u' },
+  { name:'السعودية',url:'https://iptv-org.github.io/iptv/countries/sa.m3u' },
+  { name:'رياضة',   url:'https://iptv-org.github.io/iptv/categories/sports.m3u' },
+];
+
+let allCh=[], filtered=[], curCh=null, curCat='all', hls=null;
+let favs = JSON.parse(localStorage.getItem('al_favs')||'[]');
+let curSrcName='';
+
+// ── Source select ──
+function selectSrc(i, btn) {
+  document.querySelectorAll('.src-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  curSrcName = SOURCES[i].name;
+  document.getElementById('statusSrc').textContent = curSrcName;
+  loadM3U(PROXY + encodeURIComponent(SOURCES[i].url));
+}
+
+// ── Load ──
+async function loadM3U(url) {
+  document.getElementById('grid').innerHTML = '<div class="loading-state"><div class="spinner"></div><div>جاري تحميل القنوات...</div></div>';
+  document.getElementById('catStrip').innerHTML='';
+  document.getElementById('statusCount').textContent='جاري التحميل...';
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error();
+    const txt = await r.text();
+    parseM3U(txt);
+  } catch {
+    document.getElementById('grid').innerHTML='<div class="loading-state"><span style="font-size:32px">❌</span><div style="margin-top:8px">فشل التحميل — تحقق من الاتصال</div></div>';
+    document.getElementById('statusCount').textContent='فشل التحميل';
+  }
+}
+
+function loadCustom() {
+  const url = document.getElementById('customUrl').value.trim();
+  if (!url) return;
+  closePanel();
+  curSrcName = 'مخصص';
+  document.getElementById('statusSrc').textContent='مخصص';
+  loadM3U(PROXY + encodeURIComponent(url));
+}
+
+// ── Parse ──
+function parseM3U(txt) {
+  const lines = txt.split('\n');
+  const chs = [];
+  let cur = null;
+  for (let i=0;i<lines.length;i++) {
+    const l = lines[i].trim();
+    if (l.startsWith('#EXTINF')) {
+      cur = {name:'',url:'',logo:'',group:'عام',lang:''};
+      const nm = l.match(/,(.+)$/); if (nm) cur.name=nm[1].trim();
+      const lg = l.match(/tvg-logo="([^"]+)"/); if (lg) cur.logo=lg[1];
+      const gr = l.match(/group-title="([^"]+)"/); if (gr) cur.group=gr[1]||'عام';
+      const la = l.match(/tvg-language="([^"]+)"/); if (la) cur.lang=la[1];
+    } else if (l && !l.startsWith('#') && cur) {
+      cur.url=l;
+      if (cur.name) chs.push(cur);
+      cur=null;
+    }
+  }
+  allCh=chs;
+  buildCats();
+  filterCh('all');
+  document.getElementById('chCount').textContent=chs.length.toLocaleString()+' قناة';
+  document.getElementById('liveCount').style.display='inline';
+}
+
+// ── Categories ──
+const catIcons={'news':'📰','sport':'⚽','entertain':'🎬','movie':'🎥','kid':'👧','music':'🎵','doc':'🎞️','relig':'🕌','بث مباشر':'📡','arab':'🌙','comedy':'😄','drama':'🎭'};
+function getIcon(name){
+  const n=name.toLowerCase();
+  for(const[k,v]of Object.entries(catIcons)) if(n.includes(k)) return v;
+  return '📡';
+}
+
+function buildCats() {
+  const counts={};
+  allCh.forEach(c=>counts[c.group]=(counts[c.group]||0)+1);
+  const cats=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const strip=document.getElementById('catStrip');
+  strip.innerHTML=`<button class="cat-chip active" onclick="filterCh('all')">الكل (${allCh.length})</button>`;
+  cats.forEach(([n,c])=>{
+    const btn=document.createElement('button');
+    btn.className='cat-chip';
+    btn.textContent=`${getIcon(n)} ${n} (${c})`;
+    btn.onclick=()=>filterCh(n);
+    strip.appendChild(btn);
+  });
+}
+
+function filterCh(cat) {
+  curCat=cat;
+  document.querySelectorAll('.cat-chip').forEach(b=>{
+    b.classList.toggle('active', b.textContent.includes(cat==='all'?'الكل':cat));
+  });
+  applySearch();
+}
+
+function applySearch() {
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  filtered=allCh.filter(c=>{
+    const inCat=curCat==='all'||c.group===curCat;
+    const inQ=!q||c.name.toLowerCase().includes(q)||c.group.toLowerCase().includes(q);
+    return inCat&&inQ;
+  });
+  document.getElementById('statusCount').textContent=`${filtered.length.toLocaleString()} قناة`;
+  renderGrid();
+}
+
+// ── Render ──
+function renderGrid() {
+  const grid=document.getElementById('grid');
+  const show=filtered.slice(0,300);
+  if(!show.length){
+    grid.innerHTML='<div class="loading-state"><span style="font-size:28px">🔍</span><div style="margin-top:8px">لا توجد نتائج</div></div>';
+    return;
+  }
+  grid.innerHTML=show.map(ch=>{
+    const idx=allCh.indexOf(ch);
+    const playing=curCh===ch;
+    return `<div class="ch-card${playing?' playing':''}" onclick="playCh(${idx})">
+      ${playing?'<div class="ch-dot"></div>':''}
+      ${ch.logo
+        ?`<img class="ch-logo" src="${ch.logo}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`+
+          `<div class="ch-fb" style="display:none">${ch.name.charAt(0)}</div>`
+        :`<div class="ch-fb">${ch.name.charAt(0)}</div>`
+      }
+      <div class="ch-name">${ch.name}</div>
+    </div>`;
+  }).join('');
+  if(filtered.length>300){
+    const note=document.createElement('div');
+    note.style.cssText='grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:12px';
+    note.textContent=`يعرض 300 من ${filtered.length} — ابحث للتضييق`;
+    grid.appendChild(note);
+  }
+}
+
+// ── Play ──
+function playCh(idx) {
+  const ch=allCh[idx]; if(!ch) return;
+  curCh=ch;
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('nowBar').classList.add('show');
+  document.getElementById('errBar').classList.remove('show');
+  document.getElementById('nowName').textContent=ch.name;
+  document.getElementById('nowCat').textContent=ch.group;
+  document.getElementById('favAddBtn').classList.add('show');
+  renderGrid();
+  const vid=document.getElementById('vid');
+  if(hls){hls.destroy();hls=null;}
+  const url=ch.url;
+  const isHLS=url.includes('.m3u8')||url.includes('/hls/')||url.includes('m3u');
+  if(Hls.isSupported()&&(isHLS||!url.endsWith('.mp4'))){
+    hls=new Hls({enableWorker:true,lowLatencyMode:true,fragLoadingTimeOut:10000});
+    hls.loadSource(url);
+    hls.attachMedia(vid);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>vid.play().catch(()=>{}));
+    hls.on(Hls.Events.ERROR,(e,d)=>{ if(d.fatal) showErr(); });
+  } else {
+    vid.src=url;
+    vid.play().catch(showErr);
+  }
+  vid.onerror=showErr;
+  // scroll to player
+  document.getElementById('playerWrap').scrollIntoView({behavior:'smooth'});
+}
+
+function showErr(){
+  document.getElementById('errBar').classList.add('show');
+  document.getElementById('nowBar').classList.remove('show');
+}
+
+// ── Favs ──
+function addFav(){
+  if(!curCh) return;
+  if(!favs.find(f=>f.url===curCh.url)){
+    favs.push({name:curCh.name,url:curCh.url,logo:curCh.logo,group:curCh.group});
+    localStorage.setItem('al_favs',JSON.stringify(favs));
+  }
+}
+function delFav(url){
+  favs=favs.filter(f=>f.url!==url);
+  localStorage.setItem('al_favs',JSON.stringify(favs));
+  renderFavs();
+}
+function renderFavs(){
+  const l=document.getElementById('favList');
+  if(!favs.length){
+    l.innerHTML='<div class="empty-fav">⭐<br><br>لا توجد قنوات محفوظة<br><br>اضغط ⭐ أثناء المشاهدة لإضافة قناة</div>';
+    return;
+  }
+  l.innerHTML=favs.map(f=>`
+    <div class="fav-item" onclick="playFav('${f.url.replace(/'/g,"\\'")}')">
+      <span style="font-size:22px">📺</span>
+      <span class="fav-name">${f.name}</span>
+      <button class="fav-del" onclick="event.stopPropagation();delFav('${f.url.replace(/'/g,"\\'")}')">✕</button>
+    </div>
+  `).join('');
+}
+function playFav(url){
+  closePanel();
+  const idx=allCh.findIndex(c=>c.url===url);
+  if(idx>=0) playCh(idx);
+  else {
+    const f=favs.find(c=>c.url===url);
+    if(f){allCh.push(f);playCh(allCh.length-1);}
+  }
+}
+
+// ── Nav ──
+function showHome(){
+  setNav('navHome');
+  closePanel();
+}
+function showFavs(){
+  setNav('navFav');
+  renderFavs();
+  document.getElementById('favPanel').classList.add('open');
+}
+function showCustom(){
+  setNav('navCustom');
+  document.getElementById('customPanel').classList.add('open');
+}
+function closePanel(){
+  document.getElementById('favPanel').classList.remove('open');
+  document.getElementById('customPanel').classList.remove('open');
+  setNav('navHome');
+}
+function setNav(id){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Events ──
+document.getElementById('searchInput').addEventListener('input',applySearch);
+
+// Auto-load Arabic on start
+window.onload=()=>{
+  // Auto load Arabic channels
+  selectSrc(2, document.querySelectorAll('.src-tab')[2]);
+};
+</script>
+</body>
+</html>
