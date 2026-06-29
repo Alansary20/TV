@@ -68,7 +68,9 @@ header{
 
 /* وضع ملء الشاشة المخصص (CSS فقط، بدون تسليم التحكم لمشغل نظامي) */
 .player-wrap.fs-mode{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center}
-.player-wrap.fs-mode video{width:100%;height:100%;max-height:100vh;object-fit:contain}
+.player-wrap.fs-mode video{width:100%;height:100%;max-height:100vh;object-fit:cover}
+.player-wrap.fs-mode.fit-mode video{object-fit:contain}
+.float-btn.aspect{top:50px;right:8px;width:auto;padding:0 12px;border-radius:14px;font-size:11px;font-family:inherit;font-weight:700}
 
 /* Status bar */
 .status-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
@@ -156,6 +158,7 @@ header{
   <video id="vid" playsinline preload="none"></video>
   <button class="float-btn mute" id="muteBtn" onclick="toggleMute()">🔊</button>
   <button class="float-btn fs" id="fsBtn" onclick="toggleFullscreen()">⛶</button>
+  <button class="float-btn aspect" id="aspectBtn" onclick="toggleAspect()">ملء</button>
   <div class="player-overlay" id="overlay">
     <span class="play-big">📺</span>
   </div>
@@ -474,6 +477,7 @@ function showErr(){
   document.getElementById('nowBar').classList.remove('show');
   document.getElementById('muteBtn').classList.remove('show');
   document.getElementById('fsBtn').classList.remove('show');
+  document.getElementById('aspectBtn').classList.remove('show');
 }
 
 // ── تحكّم مخصص (بدل أزرار الفيديو الأصلية) ──
@@ -492,12 +496,41 @@ async function toggleFullscreen(){
   const entering = !wrap.classList.contains('fs-mode');
   wrap.classList.toggle('fs-mode');
   document.getElementById('fsBtn').textContent = entering?'✕':'⛶';
+  document.getElementById('aspectBtn').classList.toggle('show', entering);
   if(entering){
     try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(e){}
-    requestWakeLock(); // تأكيد القفل عند الدخول لملء الشاشة المخصص
+    // محاولة إخفاء شريط حالة أندرويد عبر Fullscreen API القياسي على الحاوية (لا على الفيديو نفسه)
+    // هذا مختلف عن آلية فيديو الفل سكرين الأصلية التي تسببت بمشكلة السكون، فهو أمن
+    try{
+      if(wrap.requestFullscreen) await wrap.requestFullscreen();
+      else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+    }catch(e){ /* قد لا يدعمه الـ WebView، لا بأس — الوضع البديل بـ CSS يبقى فعالاً */ }
+    requestWakeLock();
   } else {
     try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+    try{
+      if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+      else if(document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }catch(e){}
   }
+}
+// مزامنة وضعنا المخصص إذا خرج النظام من الفل سكرين الأصلي بطريقة أخرى (زر الرجوع مثلاً)
+function syncFsState(){
+  const isNativeFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const wrap=document.getElementById('playerWrap');
+  if(!isNativeFs && wrap.classList.contains('fs-mode')){
+    wrap.classList.remove('fs-mode');
+    document.getElementById('fsBtn').textContent='⛶';
+    document.getElementById('aspectBtn').classList.remove('show');
+  }
+}
+document.addEventListener('fullscreenchange', syncFsState);
+document.addEventListener('webkitfullscreenchange', syncFsState);
+// تبديل بين "ملء الشاشة بالكامل" (مع قصّ بسيط للحواف) و"احتواء الصورة كاملة" (مع أشرطة سوداء عند اختلاف نسبة العرض للارتفاع)
+function toggleAspect(){
+  const wrap=document.getElementById('playerWrap');
+  const fit = wrap.classList.toggle('fit-mode');
+  document.getElementById('aspectBtn').textContent = fit ? 'احتواء' : 'ملء';
 }
 // زر الرجوع في أندرويد يغلق ملء الشاشة المخصص أولاً بدل إغلاق التطبيق
 window.addEventListener('popstate', ()=>{
