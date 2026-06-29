@@ -58,6 +58,18 @@ header{
 .err-bar{position:absolute;inset:0;background:var(--surface);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted)}
 .err-bar.show{display:flex}
 
+/* أزرار تحكم عائمة بديلة عن أزرار الفيديو الأصلية (لتفادي ملء الشاشة الأصلي) */
+.float-btn{position:absolute;top:8px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.25);color:#fff;font-size:15px;display:none;align-items:center;justify-content:center;
+  cursor:pointer;z-index:60;font-family:inherit}
+.float-btn.show{display:flex}
+.float-btn.mute{left:8px}
+.float-btn.fs{right:8px}
+
+/* وضع ملء الشاشة المخصص (CSS فقط، بدون تسليم التحكم لمشغل نظامي) */
+.player-wrap.fs-mode{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center}
+.player-wrap.fs-mode video{width:100%;height:100%;max-height:100vh;object-fit:contain}
+
 /* Status bar */
 .status-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 .status-count{font-size:12px;color:var(--muted)}
@@ -141,7 +153,9 @@ header{
 
 <!-- Player -->
 <div class="player-wrap" id="playerWrap">
-  <video id="vid" controls playsinline preload="none"></video>
+  <video id="vid" playsinline preload="none"></video>
+  <button class="float-btn mute" id="muteBtn" onclick="toggleMute()">🔊</button>
+  <button class="float-btn fs" id="fsBtn" onclick="toggleFullscreen()">⛶</button>
   <div class="player-overlay" id="overlay">
     <span class="play-big">📺</span>
   </div>
@@ -433,6 +447,8 @@ function playCh(idx) {
   document.getElementById('nowName').textContent=ch.name;
   document.getElementById('nowCat').textContent=ch.group;
   document.getElementById('favAddBtn').classList.add('show');
+  document.getElementById('muteBtn').classList.add('show');
+  document.getElementById('fsBtn').classList.add('show');
   renderGrid();
   const vid=document.getElementById('vid');
   if(hls){hls.destroy();hls=null;}
@@ -456,7 +472,46 @@ function playCh(idx) {
 function showErr(){
   document.getElementById('errBar').classList.add('show');
   document.getElementById('nowBar').classList.remove('show');
+  document.getElementById('muteBtn').classList.remove('show');
+  document.getElementById('fsBtn').classList.remove('show');
 }
+
+// ── تحكّم مخصص (بدل أزرار الفيديو الأصلية) ──
+document.getElementById('vid').addEventListener('click', ()=>{
+  const v=document.getElementById('vid');
+  if(!curCh) return;
+  if(v.paused) v.play().catch(()=>{}); else v.pause();
+});
+function toggleMute(){
+  const v=document.getElementById('vid');
+  v.muted=!v.muted;
+  document.getElementById('muteBtn').textContent = v.muted?'🔇':'🔊';
+}
+async function toggleFullscreen(){
+  const wrap=document.getElementById('playerWrap');
+  const entering = !wrap.classList.contains('fs-mode');
+  wrap.classList.toggle('fs-mode');
+  document.getElementById('fsBtn').textContent = entering?'✕':'⛶';
+  if(entering){
+    try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(e){}
+    requestWakeLock(); // تأكيد القفل عند الدخول لملء الشاشة المخصص
+  } else {
+    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+  }
+}
+// زر الرجوع في أندرويد يغلق ملء الشاشة المخصص أولاً بدل إغلاق التطبيق
+window.addEventListener('popstate', ()=>{
+  const wrap=document.getElementById('playerWrap');
+  if(wrap.classList.contains('fs-mode')){
+    wrap.classList.remove('fs-mode');
+    document.getElementById('fsBtn').textContent='⛶';
+  }
+});
+document.getElementById('fsBtn').addEventListener('click', ()=>{
+  // إدراج سجلّ تنقّل وهمي ليتمكن زر الرجوع من إغلاق ملء الشاشة أولاً
+  if(document.getElementById('playerWrap').classList.contains('fs-mode')) history.pushState({fs:1},'');
+});
+
 
 // ── Favs ──
 function addFav(){
